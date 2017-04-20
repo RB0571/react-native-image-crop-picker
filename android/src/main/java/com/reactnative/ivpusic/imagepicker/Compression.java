@@ -24,31 +24,31 @@ public class Compression {
         Double quality = options.hasKey("compressImageQuality") ? options.getDouble("compressImageQuality") : null;
 
         if (maxWidth == null && maxHeight == null && quality == null) {
-            Log.d("image-crop-picker", "Skipping image compression");
+            Log.d("ReactNativeJS-0", "Skipping image compression");
             return new File(originalImagePath);
         }
 
-        Log.d("image-crop-picker", "Image compression activated");
+        Log.d("ReactNativeJS-0", "Image compression activated");
         Compressor.Builder builder = new Compressor.Builder(activity)
                 .setCompressFormat(Bitmap.CompressFormat.JPEG)
                 .setDestinationDirectoryPath(Environment.getExternalStoragePublicDirectory(
                         Environment.DIRECTORY_PICTURES).getAbsolutePath());
 
         if (quality == null) {
-            Log.d("image-crop-picker", "Compressing image with quality 100");
+            Log.d("ReactNativeJS-0", "Compressing image with quality 100");
             builder.setQuality(100);
         } else {
-            Log.d("image-crop-picker", "Compressing image with quality " + (quality * 100));
+            Log.d("ReactNativeJS-0", "Compressing image with quality " + (quality * 100));
             builder.setQuality((int) (quality * 100));
         }
 
         if (maxWidth != null) {
-            Log.d("image-crop-picker", "Compressing image with max width " + maxWidth);
+            Log.d("ReactNativeJS-0", "Compressing image with max width " + maxWidth);
             builder.setMaxWidth(maxWidth);
         }
 
         if (maxHeight != null) {
-            Log.d("image-crop-picker", "Compressing image with max height " + maxHeight);
+            Log.d("ReactNativeJS-0", "Compressing image with max height " + maxHeight);
             builder.setMaxHeight(maxHeight);
         }
 

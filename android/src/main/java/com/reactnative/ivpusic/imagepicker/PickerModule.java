@@ -17,6 +17,7 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.FileProvider;
 import android.util.Base64;
 import android.webkit.MimeTypeMap;
+import android.util.Log;
 
 import com.facebook.react.bridge.ActivityEventListener;
 import com.facebook.react.bridge.Callback;
@@ -303,7 +304,7 @@ class PickerModule extends ReactContextBaseJavaModule implements ActivityEventLi
         }
 
     }
-
+    String TAG="ReactNativeJS-0";
     private void initiatePicker(final Activity activity) {
         try {
             final Intent galleryIntent = new Intent(Intent.ACTION_PICK);
@@ -313,8 +314,8 @@ class PickerModule extends ReactContextBaseJavaModule implements ActivityEventLi
             } else if (mediaType.equals("video")) {
                 galleryIntent.setType("video/*");
             } else {
-                galleryIntent.setType("*/*");
-                String[] mimetypes = {"image/*", "video/*"};
+                galleryIntent.setType("*/*");               
+                String[] mimetypes = {"image/*", "video/*"};               
                 galleryIntent.putExtra(Intent.EXTRA_MIME_TYPES, mimetypes);
             }
 
@@ -327,6 +328,15 @@ class PickerModule extends ReactContextBaseJavaModule implements ActivityEventLi
         } catch (Exception e) {
             resultCollector.notifyProblem(E_FAILED_TO_SHOW_PICKER, e);
         }
+            //galleryIntent.setType("*/*");
+            //String[] mimetypes = {"image/*", "video/*"};
+            /*
+            Intent intent = new Intent(Intent.ACTION_PICK);    
+            intent.setType("image/*");  
+            intent.setAction(Intent.ACTION_GET_CONTENT);  
+            intent.addCategory(Intent.CATEGORY_OPENABLE); 
+            activity.startActivityForResult(intent, IMAGE_PICKER_REQUEST);  
+            */
     }
 
     @ReactMethod
@@ -413,6 +423,7 @@ class PickerModule extends ReactContextBaseJavaModule implements ActivityEventLi
     }
 
     private void getAsyncSelection(final Activity activity, Uri uri, boolean isCamera) throws Exception {
+
         String path = resolveRealPath(activity, uri, isCamera);
         if (path == null || path.isEmpty()) {
             resultCollector.notifyProblem(E_NO_IMAGE_DATA_FOUND, "Cannot resolve asset path.");
@@ -480,7 +491,6 @@ class PickerModule extends ReactContextBaseJavaModule implements ActivityEventLi
 
     private String resolveRealPath(Activity activity, Uri uri, boolean isCamera) {
         String path;
-
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
             path = RealPathUtil.getRealPathFromURI(activity, uri);
         } else {
@@ -495,14 +505,54 @@ class PickerModule extends ReactContextBaseJavaModule implements ActivityEventLi
         return path;
     }
 
+    public int computeSampleSize(BitmapFactory.Options options, int minSideLength, int maxNumOfPixels) { 
+        int initialSize = computeInitialSampleSize(options, minSideLength, maxNumOfPixels);
+        int roundedSize; 
+        if(initialSize <= 8){ 
+            roundedSize = 1;
+            while (roundedSize < initialSize) { 
+                roundedSize <<= 1;
+            }
+        } else { 
+            roundedSize = (initialSize + 7) / 8 * 8;
+        }
+
+        return roundedSize; 
+
+    }
+
+    private int computeInitialSampleSize(BitmapFactory.Options options, int minSideLength, int maxNumOfPixels) { 
+
+        double w = options.outWidth; 
+        double h = options.outHeight;  
+
+        int lowerBound = (maxNumOfPixels == -1) ? 1 : (int) Math.ceil(Math.sqrt(w * h / maxNumOfPixels)); 
+        int upperBound = (minSideLength == -1) ? 128 : (int)Math.min(Math.floor(w / minSideLength), Math.floor(h / minSideLength)); 
+
+        if(upperBound < lowerBound) { 
+            //return the larger one when there is no overlapping zone. 
+            return lowerBound; 
+        }
+
+        if((maxNumOfPixels == -1) && (minSideLength == -1)) { 
+            return 1;
+        }else if(minSideLength == -1) { 
+            return lowerBound; 
+        }else{
+            return upperBound; 
+        }
+
+    } 
     private BitmapFactory.Options validateImage(String path) throws Exception {
         BitmapFactory.Options options = new BitmapFactory.Options();
         options.inJustDecodeBounds = true;
         options.inPreferredConfig = Bitmap.Config.RGB_565;
         options.inDither = true;
-
         BitmapFactory.decodeFile(path, options);
 
+        options.inSampleSize=computeSampleSize(options,-1,640*480);
+        BitmapFactory.decodeFile(path,options);
+               
         if (options.outMimeType == null || options.outWidth == 0 || options.outHeight == 0) {
             throw new Exception("Invalid image selected");
         }
@@ -520,18 +570,20 @@ class PickerModule extends ReactContextBaseJavaModule implements ActivityEventLi
 
         // if compression options are provided image will be compressed. If none options is provided,
         // then original image will be returned
-        File compressedImage = compression.compressImage(activity, options, path);
-        String compressedImagePath = compressedImage.getPath();
-        BitmapFactory.Options options = validateImage(compressedImagePath);
+        //File compressedImage = compression.compressImage(activity, options, path);
 
-        image.putString("path", "file://" + compressedImagePath);
-        image.putInt("width", options.outWidth);
-        image.putInt("height", options.outHeight);
+        //String compressedImagePath = compressedImage.getPath();
+        //Log.i(TAG,compressedImagePath);
+        BitmapFactory.Options options = validateImage(path);
+        
+        image.putString("path", "file://" + path);
+        image.putInt("width", options.outWidth);//options.outWidth);
+        image.putInt("height", options.outHeight);//options.outHeight);
         image.putString("mime", options.outMimeType);
-        image.putInt("size", (int) new File(compressedImagePath).length());
+        image.putInt("size", (int) new File(path).length());
 
         if (includeBase64) {
-            image.putString("data", getBase64StringFromFile(compressedImagePath));
+            image.putString("data", getBase64StringFromFile(path));
         }
 
         return image;
@@ -578,6 +630,7 @@ class PickerModule extends ReactContextBaseJavaModule implements ActivityEventLi
     }
 
     private void imagePickerResult(Activity activity, final int requestCode, final int resultCode, final Intent data) {
+        
         if (resultCode == Activity.RESULT_CANCELED) {
             resultCollector.notifyProblem(E_PICKER_CANCELLED_KEY, E_PICKER_CANCELLED_MSG);
         } else if (resultCode == Activity.RESULT_OK) {
@@ -600,8 +653,9 @@ class PickerModule extends ReactContextBaseJavaModule implements ActivityEventLi
                 }
 
             } else {
+                Log.i(TAG,"0000000000000000");
                 Uri uri = data.getData();
-
+                Log.i(TAG,""+uri);
                 if (uri == null) {
                     resultCollector.notifyProblem(E_NO_IMAGE_DATA_FOUND, "Cannot resolve image url");
                     return;
