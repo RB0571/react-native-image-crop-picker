@@ -42,6 +42,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Callable;
@@ -61,12 +62,13 @@ class PickerModule extends ReactContextBaseJavaModule implements ActivityEventLi
     private static final String E_NO_IMAGE_DATA_FOUND = "E_NO_IMAGE_DATA_FOUND";
     private static final String E_CAMERA_IS_NOT_AVAILABLE = "E_CAMERA_IS_NOT_AVAILABLE";
     private static final String E_CANNOT_LAUNCH_CAMERA = "E_CANNOT_LAUNCH_CAMERA";
-    private static final String E_PERMISSIONS_MISSING = "E_PERMISSIONS_MISSING";
+    private static final String E_PERMISSIONS_MISSING = "E_PERMISSION_MISSING";
     private static final String E_ERROR_WHILE_CLEANING_FILES = "E_ERROR_WHILE_CLEANING_FILES";
 
     private String mediaType = "any";
     private boolean multiple = false;
     private boolean includeBase64 = false;
+    private boolean includeExif = false;
     private boolean cropping = false;
     private boolean cropperCircleOverlay = false;
     private boolean showCropGuidelines = true;
@@ -77,7 +79,9 @@ class PickerModule extends ReactContextBaseJavaModule implements ActivityEventLi
 
     //Grey 800
     private final String DEFAULT_TINT = "#424242";
-    private String cropperTintColor = DEFAULT_TINT;
+    private String cropperActiveWidgetColor = DEFAULT_TINT;
+    private String cropperStatusBarColor = DEFAULT_TINT;
+    private String cropperToolbarColor = DEFAULT_TINT;
 
     //Light Blue 500
     private final String DEFAULT_WIDGET_COLOR = "#03A9F4";
@@ -110,10 +114,13 @@ class PickerModule extends ReactContextBaseJavaModule implements ActivityEventLi
         mediaType = options.hasKey("mediaType") ? options.getString("mediaType") : mediaType;
         multiple = options.hasKey("multiple") && options.getBoolean("multiple");
         includeBase64 = options.hasKey("includeBase64") && options.getBoolean("includeBase64");
+        includeExif = options.hasKey("includeExif") && options.getBoolean("includeExif");
         width = options.hasKey("width") ? options.getInt("width") : width;
         height = options.hasKey("height") ? options.getInt("height") : height;
         cropping = options.hasKey("cropping") ? options.getBoolean("cropping") : cropping;
-        cropperTintColor = options.hasKey("cropperTintColor") ? options.getString("cropperTintColor") : cropperTintColor;
+        cropperActiveWidgetColor = options.hasKey("cropperActiveWidgetColor") ? options.getString("cropperActiveWidgetColor") : cropperActiveWidgetColor;
+        cropperStatusBarColor = options.hasKey("cropperStatusBarColor") ? options.getString("cropperStatusBarColor") : cropperStatusBarColor;
+        cropperToolbarColor = options.hasKey("cropperToolbarColor") ? options.getString("cropperToolbarColor") : cropperToolbarColor;
         cropperCircleOverlay = options.hasKey("cropperCircleOverlay") ? options.getBoolean("cropperCircleOverlay") : cropperCircleOverlay;
         showCropGuidelines = options.hasKey("showCropGuidelines") ? options.getBoolean("showCropGuidelines") : showCropGuidelines;
         hideBottomControls = options.hasKey("hideBottomControls") ? options.getBoolean("hideBottomControls") : hideBottomControls;
@@ -351,7 +358,7 @@ class PickerModule extends ReactContextBaseJavaModule implements ActivityEventLi
         setConfiguration(options);
         resultCollector = new ResultCollector(promise, multiple);
 
-        permissionsCheck(activity, promise, Arrays.asList(Manifest.permission.WRITE_EXTERNAL_STORAGE), new Callable<Void>() {
+        permissionsCheck(activity, promise, Collections.singletonList(Manifest.permission.WRITE_EXTERNAL_STORAGE), new Callable<Void>() {
             @Override
             public Void call() throws Exception {
                 initiatePicker(activity);
@@ -586,14 +593,25 @@ class PickerModule extends ReactContextBaseJavaModule implements ActivityEventLi
             image.putString("data", getBase64StringFromFile(path));
         }
 
+        if (includeExif) {
+            try {
+                WritableMap exif = ExifExtractor.extract(path);
+                image.putMap("exif", exif);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+        }
+
         return image;
     }
 
     private void configureCropperColors(UCrop.Options options) {
-        int color = Color.parseColor(cropperTintColor);
-        options.setToolbarColor(color);
-        options.setStatusBarColor(color);
-        if (cropperTintColor.equals(DEFAULT_TINT)) {
+        int activeWidgetColor = Color.parseColor(cropperActiveWidgetColor);
+        int toolbarColor = Color.parseColor(cropperToolbarColor);
+        int statusBarColor = Color.parseColor(cropperStatusBarColor);
+        options.setToolbarColor(toolbarColor);
+        options.setStatusBarColor(statusBarColor);
+        if (activeWidgetColor == Color.parseColor(DEFAULT_TINT)) {
             /*
             Default tint is grey => use a more flashy color that stands out more as the call to action
             Here we use 'Light Blue 500' from https://material.google.com/style/color.html#color-color-palette
@@ -601,7 +619,7 @@ class PickerModule extends ReactContextBaseJavaModule implements ActivityEventLi
             options.setActiveWidgetColor(Color.parseColor(DEFAULT_WIDGET_COLOR));
         } else {
             //If they pass a custom tint color in, we use this for everything
-            options.setActiveWidgetColor(color);
+            options.setActiveWidgetColor(activeWidgetColor);
         }
     }
 
@@ -615,9 +633,9 @@ class PickerModule extends ReactContextBaseJavaModule implements ActivityEventLi
         if (enableRotationGesture) {
             // UCropActivity.ALL = enable both rotation & scaling
             options.setAllowedGestures(
-                UCropActivity.ALL, // When 'scale'-tab active
-                UCropActivity.ALL, // When 'rotate'-tab active
-                UCropActivity.ALL  // When 'aspect ratio'-tab active
+                    UCropActivity.ALL, // When 'scale'-tab active
+                    UCropActivity.ALL, // When 'rotate'-tab active
+                    UCropActivity.ALL  // When 'aspect ratio'-tab active
             );
         }
         configureCropperColors(options);
@@ -691,6 +709,7 @@ class PickerModule extends ReactContextBaseJavaModule implements ActivityEventLi
                 startCropping(activity, uri);
             } else {
                 try {
+                    resultCollector.setWaitCount(1);
                     resultCollector.notifySuccess(getSelection(activity, uri, true));
                 } catch (Exception ex) {
                     resultCollector.notifyProblem(E_NO_IMAGE_DATA_FOUND, ex.getMessage());
@@ -704,6 +723,7 @@ class PickerModule extends ReactContextBaseJavaModule implements ActivityEventLi
             final Uri resultUri = UCrop.getOutput(data);
             if (resultUri != null) {
                 try {
+                    resultCollector.setWaitCount(1);
                     resultCollector.notifySuccess(getSelection(activity, resultUri, false));
                 } catch (Exception ex) {
                     resultCollector.notifyProblem(E_NO_IMAGE_DATA_FOUND, ex.getMessage());

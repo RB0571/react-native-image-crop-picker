@@ -9,6 +9,7 @@ import com.facebook.react.bridge.Promise;
 import com.facebook.react.bridge.ReadableMap;
 
 import java.io.File;
+import java.io.IOException;
 
 import id.zelory.compressor.Compressor;
 
@@ -18,7 +19,7 @@ import id.zelory.compressor.Compressor;
 
 public class Compression {
 
-    public File compressImage(final Activity activity, final ReadableMap options, final String originalImagePath) {
+    public File compressImage(final Activity activity, final ReadableMap options, final String originalImagePath) throws IOException {
         Integer maxWidth = options.hasKey("compressImageMaxWidth") ? options.getInt("compressImageMaxWidth") : null;
         Integer maxHeight = options.hasKey("compressImageMaxHeight") ? options.getInt("compressImageMaxHeight") : null;
         Double quality = options.hasKey("compressImageQuality") ? options.getDouble("compressImageQuality") : null;
@@ -52,9 +53,16 @@ public class Compression {
             builder.setMaxHeight(maxHeight);
         }
 
-        return builder
-                .build()
-                .compressToFile(new File(originalImagePath));
+        File image = new File(originalImagePath); 
+
+        String[] paths = image.getName().split("\\.(?=[^\\.]+$)");
+        String compressedFileName = paths[0] + "-compressed";
+        
+        if(paths.length > 1)
+            compressedFileName += "." + paths[1];
+        
+        return compressor
+                .compressToFile(image, compressedFileName);
     }
 
     public synchronized void compressVideo(final Activity activity, final ReadableMap options, final String originalVideo, final String compressedVideo, final Promise promise) {
