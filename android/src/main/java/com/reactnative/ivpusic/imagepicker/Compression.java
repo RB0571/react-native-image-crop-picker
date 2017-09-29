@@ -25,32 +25,32 @@ public class Compression {
         Double quality = options.hasKey("compressImageQuality") ? options.getDouble("compressImageQuality") : null;
 
         if (maxWidth == null && maxHeight == null && quality == null) {
-            Log.d("ReactNativeJS-0", "Skipping image compression");
+            Log.d("image-crop-picker", "Skipping image compression");
             return new File(originalImagePath);
         }
 
-        Log.d("ReactNativeJS-0", "Image compression activated");
-        Compressor.Builder builder = new Compressor.Builder(activity)
+        Log.d("image-crop-picker", "Image compression activated");
+        Compressor compressor = new Compressor(activity)
                 .setCompressFormat(Bitmap.CompressFormat.JPEG)
                 .setDestinationDirectoryPath(Environment.getExternalStoragePublicDirectory(
                         Environment.DIRECTORY_PICTURES).getAbsolutePath());
 
         if (quality == null) {
-            Log.d("ReactNativeJS-0", "Compressing image with quality 100");
-            builder.setQuality(100);
+            Log.d("image-crop-picker", "Compressing image with quality 100");
+            compressor.setQuality(100);
         } else {
-            Log.d("ReactNativeJS-0", "Compressing image with quality " + (quality * 100));
-            builder.setQuality((int) (quality * 100));
+            Log.d("image-crop-picker", "Compressing image with quality " + (quality * 100));
+            compressor.setQuality((int) (quality * 100));
         }
 
         if (maxWidth != null) {
-            Log.d("ReactNativeJS-0", "Compressing image with max width " + maxWidth);
-            builder.setMaxWidth(maxWidth);
+            Log.d("image-crop-picker", "Compressing image with max width " + maxWidth);
+            compressor.setMaxWidth(maxWidth);
         }
 
         if (maxHeight != null) {
-            Log.d("ReactNativeJS-0", "Compressing image with max height " + maxHeight);
-            builder.setMaxHeight(maxHeight);
+            Log.d("image-crop-picker", "Compressing image with max height " + maxHeight);
+            compressor.setMaxHeight(maxHeight);
         }
 
         File image = new File(originalImagePath); 
